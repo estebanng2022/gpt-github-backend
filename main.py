@@ -4,16 +4,16 @@ import pathlib
 import base64
 import httpx
 
-from fastapi import FastAPI, HTTPException, Request, Body, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 
 # ---------- LOGGING ----------
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_DIR   = pathlib.Path("/tmp")
+LOG_DIR = pathlib.Path("/tmp")
 LOG_DIR.mkdir(exist_ok=True)
-LOG_FILE  = LOG_DIR / "gpt_backend.log"
+LOG_FILE = LOG_DIR / "gpt_backend.log"
 
 logging.basicConfig(
     filename=str(LOG_FILE),
@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ---------- FASTAPI APP w/ servers spec ----------
+# ---------- FASTAPI APP ----------
 BACKEND_URL = os.getenv("BACKEND_URL", "https://gpt-github-backend.onrender.com")
 app = FastAPI(
     title="GPT GitHub Backend",
@@ -31,24 +31,29 @@ app = FastAPI(
 )
 security = HTTPBearer()
 
+# ---------- ENV VARIABLES ----------
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+SLACK_URL = os.getenv("SLACK_URL")
+
 # ---------- HEALTH ENDPOINT ----------
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 # ---------- NOTIFY ENDPOINT ----------
-NOTIFY_SECRET = os.getenv("NOTIFY_SECRET")
-SLACK_URL     = os.getenv("SLACK_URL")
-
 class NotifyPayload(BaseModel):
     subject: str
     text: str
 
 @app.post("/notify")
-async def send_notify(payload: NotifyPayload, request: Request):
-    token = request.headers.get("X-Notify-Token")
-    if token != NOTIFY_SECRET:
-        raise HTTPException(401, "Invalid token")
+async def send_notify(
+    payload: NotifyPayload,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = credentials.credentials
+    if token != GITHUB_TOKEN:
+        raise HTTPException(401, "Invalid master token")
+
     if not SLACK_URL:
         raise HTTPException(500, "SLACK_URL not set")
 
@@ -80,12 +85,14 @@ async def get_repo_tree(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     token = credentials.credentials
+    if token != GITHUB_TOKEN:
+        raise HTTPException(401, "Invalid master token")
+
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
     }
 
-    # 1) Obtener árbol completo (GitHub acepta nombre de branch en lugar de sha)
     url = (
         f"https://api.github.com/repos/{data.username}/{data.repo}"
         f"/git/trees/{data.branch}?recursive=1"
@@ -99,7 +106,6 @@ async def get_repo_tree(
     raw_tree = resp.json().get("tree", [])
     logger.info(f"Fetched raw tree: {len(raw_tree)} items")
 
-    # 2) Filtrar por prefix y depth
     base_depth = prefix.count("/")
     dirs: List[str] = []
     for item in raw_tree:
@@ -117,12 +123,12 @@ async def get_repo_tree(
 
 # ---------- /github/file ENDPOINT ----------
 class WriteFileRequest(BaseModel):
-    username:       str
-    repo:           str
-    branch:         str
-    path:           str        # ruta dentro del repo
-    content_base64: str        # contenido en base64
-    message:        str        # commit message
+    username: str
+    repo: str
+    branch: str
+    path: str
+    content_base64: str
+    message: str
 
 @app.post("/github/file", summary="Create or update a file on GitHub")
 async def write_file(
@@ -130,12 +136,14 @@ async def write_file(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     token = credentials.credentials
+    if token != GITHUB_TOKEN:
+        raise HTTPException(401, "Invalid master token")
+
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept":        "application/vnd.github.v3+json",
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
     }
 
-    # Armar payload de GitHub
     gh_url = (
         f"https://api.github.com/repos/{req.username}/{req.repo}"
         f"/contents/{req.path}"
@@ -143,7 +151,7 @@ async def write_file(
     payload = {
         "message": req.message,
         "content": req.content_base64,
-        "branch":  req.branch,
+        "branch": req.branch,
     }
 
     async with httpx.AsyncClient() as client:
@@ -155,5 +163,3 @@ async def write_file(
 
     logger.info(f"File '{req.path}' written to {req.repo}@{req.branch}")
     return {"status": "ok", "url": resp.json().get("content", {}).get("html_url")}
-
-# ========== FIN ==========
