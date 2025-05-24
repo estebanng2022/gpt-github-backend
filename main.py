@@ -73,38 +73,4 @@ async def get_repo_tree(
 
     return dirs
 # ========== FIN ENDPOINT ==========
-  /analyze:
-    post:
-      summary: Analyze repo structure
-      operationId: analyzeStructure
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AnalyzeRequest"
-      responses:
-        "200":
-          description: Issues found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count: { type: integer }
-                  issues:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        path: { type: string }
-                        recommendation: { type: string }
-components:
-  schemas:
-    AnalyzeRequest:
-      type: object
-      properties:
-        dirs:
-          type: array
-          items: { type: string }
-      required: [dirs]
+ 
