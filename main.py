@@ -1,12 +1,16 @@
-# ---------- IMPORTS & LOGGING ----------
-import os, logging, pathlib, httpx
-from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel     # ← necesario para NotifyPayload
+import os
+import logging
+import pathlib
+import base64
+import httpx
 
+from fastapi import FastAPI, HTTPException, Request, Body, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
+
+# ---------- LOGGING ----------
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-
-# usa /tmp, siempre existe en Render
-LOG_DIR  = pathlib.Path("/tmp")
+LOG_DIR = pathlib.Path("/tmp")
 LOG_FILE = LOG_DIR / "gpt_backend.log"
 
 logging.basicConfig(
@@ -17,7 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------- FASTAPI APP ----------
-app = FastAPI()        # ←  ¡debe ir antes de los decoradores!
+app = FastAPI()
+security = HTTPBearer()
 
 # ---------- HEALTH ENDPOINT ----------
 @app.get("/health")
@@ -25,18 +30,15 @@ def health():
     return {"status": "ok"}
 
 # ---------- /notify ENDPOINT ----------
-NOTIFY_SECRET = os.getenv("NOTIFY_SECRET")   # define en Render
-SLACK_URL     = os.getenv("SLACK_URL")       # define en Render
-
+NOTIFY_SECRET = os.getenv("NOTIFY_SECRET")
+SLACK_URL = os.getenv("SLACK_URL")
 
 class NotifyPayload(BaseModel):
     subject: str
     text: str
 
-
 @app.post("/notify")
 async def send_notify(payload: NotifyPayload, request: Request):
-    # token simple en cabecera
     if request.headers.get("X-Notify-Token") != NOTIFY_SECRET:
         raise HTTPException(401, "Invalid token")
 
@@ -54,3 +56,33 @@ async def send_notify(payload: NotifyPayload, request: Request):
 
     logger.info(f"Notification sent: {payload.subject}")
     return {"status": "sent"}
+
+# ---------- /github/tree ENDPOINT ----------
+class TreeRequest(BaseModel):
+    username: str
+    repo: str
+    branch: str
+
+@app.post("/github/tree")
+async def get_repo_tree(request: TreeRequest):
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        raise HTTPException(500, "GITHUB_TOKEN not set")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    url = f"https://api.github.com/repos/{request.username}/{request.repo}/git/trees/{request.branch}?recursive=1"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=headers, timeout=10)
+
+    if resp.status_code != 200:
+        logger.error(f"GitHub error {resp.status_code}: {resp.text}")
+        raise HTTPException(resp.status_code, resp.text)
+
+    tree = resp.json()
+    logger.info(f"Fetched tree for {request.username}/{request.repo}@{request.branch}")
+    return tree
