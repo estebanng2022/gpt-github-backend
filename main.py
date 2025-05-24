@@ -7,12 +7,15 @@ import httpx
 app = FastAPI()
 security = HTTPBearer()
 
-# --------- MODELOS ---------
+# ---------- MODELOS ----------
 class TreeRequest(BaseModel):
     username: str
     repo: str
     branch: str
-# ---------------------------
+
+class AnalyzeRequest(BaseModel):
+    dirs: List[str]
+# --------------------------------
 
 
 # ========= ENDPOINT /github/tree =========
@@ -72,5 +75,43 @@ async def get_repo_tree(
         dirs.append(path)
 
     return dirs
-# ========== FIN ENDPOINT ==========
- 
+# ========== FIN /github/tree ==========
+
+
+# ============ ENDPOINT /analyze ============
+@app.post("/analyze")
+def analyze_structure(req: AnalyzeRequest):
+    issues = []
+
+    # 1. theme/enums mal nombrada
+    if "lib/core/theme/enums" in req.dirs:
+        issues.append({
+            "path": "lib/core/theme/enums",
+            "recommendation": "Renombrar a lib/core/theme/models o lib/core/theme/tokens."
+        })
+
+    # 2. .../screens/sections redundante
+    for d in req.dirs:
+        if d.endswith("/presentation/screens/sections"):
+            issues.append({
+                "path": d,
+                "recommendation": "Mover secciones a presentation/widgets o eliminarlas."
+            })
+
+    # 3. shared/widgets/helpers mal ubicado
+    if "lib/shared/widgets/helpers" in req.dirs:
+        issues.append({
+            "path": "lib/shared/widgets/helpers",
+            "recommendation": "Mover a lib/shared/utils."
+        })
+
+    # 4. tests duplicados
+    for d in req.dirs:
+        if "/test/features/auth/onboarding/screens" in d:
+            issues.append({
+                "path": d,
+                "recommendation": "Unificar jerarquía de tests; eliminar duplicados."
+            })
+
+    return {"count": len(issues), "issues": issues}
+# ============ FIN /analyze ============
