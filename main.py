@@ -4,7 +4,7 @@ import pathlib
 import base64
 import httpx
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional
@@ -53,7 +53,6 @@ async def send_notify(
     token = credentials.credentials
     if token != GITHUB_TOKEN:
         raise HTTPException(401, "Invalid master token")
-
     if not SLACK_URL:
         raise HTTPException(500, "SLACK_URL not set")
 
@@ -92,7 +91,6 @@ async def get_repo_tree(
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
     }
-
     url = (
         f"https://api.github.com/repos/{data.username}/{data.repo}"
         f"/git/trees/{data.branch}?recursive=1"
@@ -143,7 +141,6 @@ async def write_file(
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
     }
-
     gh_url = (
         f"https://api.github.com/repos/{req.username}/{req.repo}"
         f"/contents/{req.path}"
@@ -163,3 +160,47 @@ async def write_file(
 
     logger.info(f"File '{req.path}' written to {req.repo}@{req.branch}")
     return {"status": "ok", "url": resp.json().get("content", {}).get("html_url")}
+
+# ---------- /github/content ENDPOINT ----------
+class ContentRequest(BaseModel):
+    username: str
+    repo: str
+    branch: str
+    path: str
+
+class ContentResponse(BaseModel):
+    sha: str
+    content_base64: Optional[str] = None
+
+@app.post(
+    "/github/content",
+    summary="Get file content and SHA",
+    response_model=ContentResponse,
+)
+async def get_file_content(
+    req: ContentRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = credentials.credentials
+    if token != GITHUB_TOKEN:
+        raise HTTPException(401, "Invalid master token")
+
+    gh_url = f"https://api.github.com/repos/{req.username}/{req.repo}/contents/{req.path}"
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(gh_url, headers=headers, timeout=10)
+
+    if resp.status_code == 404:
+        raise HTTPException(404, "File not found")
+    if resp.status_code != 200:
+        logger.error(f"GitHub content error {resp.status_code}: {resp.text}")
+        raise HTTPException(resp.status_code, resp.text)
+
+    body = resp.json()
+    return ContentResponse(
+        sha=body["sha"],
+        content_base64=body.get("content"),
+    )
