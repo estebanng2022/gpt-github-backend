@@ -1,6 +1,6 @@
-# PApeline-Supervisor
+# PAYLOAD
+Placeholder instructions for Pipeline-Supervisor.
 
-PLIACEHOLDER INSTRUCTIONS:
-This file is placeholder. Put operational instructions here.
+This GPT is marked as *pending_instructions* and cannot operate.
 
-Status: pending_instructions.
+Requires updated instructions to activate.
