@@ -1,6 +1,1 @@
-# PAYLOAD
-Placeholder instructions for Pipeline-Supervisor.
-
-This GPT is marked as *pending_instructions* and cannot operate.
-
-Requires updated instructions to activate.
+Las instrucciones están divididas en partes. Revisa los archivos: instructions_part1.md, instructions_part2.md, instructions_part3.md apara obtener el contenido completo.
