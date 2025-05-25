@@ -3,5 +3,10 @@
     "folder": "/project-assembler/gpts/GNS-user/",
     "purpose": "Test GPT for GNS user",
     "status": "active"
+  },
+  "Pipeline-Supervisor": {
+    "folder": "/project-assembler/gpts/Pipeline-Supervisor/",
+    "purpose": "Central coordinator that tracks project progress, gates each GPT stage, updates progress_report.md, logs errors, and sends Slack notifications… never edits production code.",
+    "status": "pending_instructions"
   }
 }
