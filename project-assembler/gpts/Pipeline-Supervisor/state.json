@@ -1,1 +1,4 @@
-{"status": "pending_instructions", "name": "Pipeline-Supervisor", "purpose": "Supervises and coordinates all system pipelines, ensuring tasks are ordered, monitored, and logged correctly."}
+{
+  "status": "pending_instructions",
+  "purpose": "Central coordinator that tracks project progress, gates each GPT stage, updates progress_report.md, logs errors, and sends Slack notifications--never edits production code."
+}
