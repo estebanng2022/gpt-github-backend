@@ -1,7 +1,6 @@
 import os
 import logging
 import pathlib
-import base64
 import httpx
 
 from fastapi import FastAPI, HTTPException, Depends
@@ -50,8 +49,7 @@ async def send_notify(
     payload: NotifyPayload,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    token = credentials.credentials
-    if token != GITHUB_TOKEN:
+    if credentials.credentials != GITHUB_TOKEN:
         raise HTTPException(401, "Invalid master token")
     if not SLACK_URL:
         raise HTTPException(500, "SLACK_URL not set")
@@ -83,8 +81,7 @@ async def get_repo_tree(
     depth: Optional[int] = None,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    token = credentials.credentials
-    if token != GITHUB_TOKEN:
+    if credentials.credentials != GITHUB_TOKEN:
         raise HTTPException(401, "Invalid master token")
 
     headers = {
@@ -133,8 +130,7 @@ async def write_file(
     req: WriteFileRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    token = credentials.credentials
-    if token != GITHUB_TOKEN:
+    if credentials.credentials != GITHUB_TOKEN:
         raise HTTPException(401, "Invalid master token")
 
     headers = {
@@ -145,12 +141,24 @@ async def write_file(
         f"https://api.github.com/repos/{req.username}/{req.repo}"
         f"/contents/{req.path}"
     )
+
+    # 1) Intentar obtener el SHA actual (si existe)
+    sha: Optional[str] = None
+    async with httpx.AsyncClient() as client:
+        get_resp = await client.get(gh_url, headers=headers, timeout=5)
+    if get_resp.status_code == 200:
+        sha = get_resp.json().get("sha")
+
+    # 2) Preparar payload incluyendo el sha si lo había
     payload = {
         "message": req.message,
         "content": req.content_base64,
         "branch": req.branch,
     }
+    if sha:
+        payload["sha"] = sha
 
+    # 3) Hacer el PUT definitivo
     async with httpx.AsyncClient() as client:
         resp = await client.put(gh_url, headers=headers, json=payload, timeout=10)
 
@@ -181,8 +189,7 @@ async def get_file_content(
     req: ContentRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    token = credentials.credentials
-    if token != GITHUB_TOKEN:
+    if credentials.credentials != GITHUB_TOKEN:
         raise HTTPException(401, "Invalid master token")
 
     gh_url = f"https://api.github.com/repos/{req.username}/{req.repo}/contents/{req.path}"
