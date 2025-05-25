@@ -1,3 +1,2 @@
 # Changelog
-
-[2025-05-24] GPT created: Pipeline-Supervisor folder with placeholder files.
+- 2025-05-25: Created Pipeline-Supervisor with pending_instructions status.
