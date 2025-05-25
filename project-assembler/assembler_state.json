@@ -1,14 +1,7 @@
 {
-  "date": "2025-05-24",
-  "gpts": [
-    {
-      "name": "Pipeline-Supervisor",
-      "purpose": "Supervises and coordinates all system pipelines",
-      "folder": "/project-assembler/gpts/Pipeline-Supervisor/",
-      "instructions_path": "/project-assembler/gpts/Pipeline-Supervisor/instructions.md",
-      "state_path": "/project-assembler/gpts/Pipeline-Supervisor/state.json",
-      "changelog_path": "/project-assembler/gpts/Pipeline-Supervisor/changelog.md",
-      "status": "pending_instructions"
-    }
-  ]
+  "GNS-user": {
+    "folder": "/project-assembler/gpts/GNS-user/",
+    "purpose": "Test GPT for GNS user",
+    "status": "active"
+  }
 }
