@@ -1,0 +1,243 @@
+openapi: 3.1.0
+info:
+  title: GPT GitHub Backend (Private)
+  version: 1.1.0
+servers:
+  - url: https://gpt-github-backend.onrender.com
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+
+  /notify:
+    post:
+      summary: Send Notification
+      operationId: sendNotification
+      security:
+        - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotifyPayload"
+      responses:
+        "200":
+          description: Notification Sent
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+
+  /github/tree:
+    post:
+      summary: Get Repository Tree
+      operationId: getRepoTree
+      security:
+        - HTTPBearer: []
+      parameters:
+        - name: prefix
+          in: query
+          required: false
+          schema:
+            type: string
+            default: lib/
+        - name: depth
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TreeRequest"
+      responses:
+        "200":
+          description: Repo Tree Retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+
+  /github/file:
+    post:
+      summary: Create or Update File on GitHub
+      operationId: createOrUpdateFile
+      security:
+        - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WriteFileRequest"
+      responses:
+        "200":
+          description: File Operation Successful
+          content:
+            application/json:
+              schema: {}
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPValidationError"
+
+  /github/content:
+    post:
+      summary: Get file content and SHA
+      operationId: getFileContent
+      security:
+        - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentRequest"
+      responses:
+        "200":
+          description: File content and SHA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentResponse"
+        "404":
+          description: File not found
+
+components:
+  schemas:
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationError"
+
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+
+    NotifyPayload:
+      type: object
+      required:
+        - subject
+        - text
+      properties:
+        subject:
+          type: string
+        text:
+          type: string
+
+    TreeRequest:
+      type: object
+      required:
+        - username
+        - repo
+        - branch
+      properties:
+        username:
+          type: string
+        repo:
+          type: string
+        branch:
+          type: string
+
+    WriteFileRequest:
+      type: object
+      required:
+        - username
+        - repo
+        - branch
+        - path
+        - content_base64
+        - message
+        - sha?
+      properties:
+        username:
+          type: string
+        repo:
+          type: string
+        branch:
+          type: string
+        path:
+          type: string
+        content_base64:
+          type: string
+        message:
+          type: string
+        sha:
+          type: string
+          description: SHA of existing file; include when updating
+
+    ContentRequest:
+      type: object
+      required:
+        - username
+        - repo
+        - branch
+        - path
+      properties:
+        username:
+          type: string
+        repo:
+          type: string
+        branch:
+          type: string
+        path:
+          type: string
+
+    ContentResponse:
+      type: object
+      required:
+        - sha
+      properties:
+        sha:
+          type: string
+        content_base64:
+          type: string
+
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
